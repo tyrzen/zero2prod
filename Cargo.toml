@@ -4,8 +4,50 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "zero2prod"
+path = "src/lib.rs"
 
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+[[bin]]
+path = "src/main.rs"
+name = "zero2prod"
+
+[target.x86_64-windows-msvc]
+rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=lld"]
 
 [dependencies]
+actix-web = "4"
+tracing-actix-web = "0.7"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1", features = ["derive"]}
+clap = { version ="4.4.11" , features = ["derive", "env"]}
+dotenv="0.15.0"
+chrono = "0.4.31"
+uuid = { version = "1", features = ["v4"] }
+tracing = {version = "0.1", features = ["log"]}
+tracing-subscriber = {version = "0.3", features = ["registry", "env-filter"]}
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.2"
+secrecy = {version= "0.8", features = ["serde"]}
+
+[dev-dependencies]
+reqwest = "0.11"
+once_cell = "1"
+
+[dependencies.sqlx]
+version = "0.7"
+default-features = false
+features = [
+    "tls-rustls",
+    "runtime-async-std",
+    "macros",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate"
+]
+
+
+[lints.clippy]
+needless_return = "allow"
+
