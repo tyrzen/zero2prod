@@ -4,6 +4,7 @@ use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
+use sqlx::ConnectOptions;
 use std::convert::{TryFrom, TryInto};
 
 pub enum Environment {
@@ -53,7 +54,10 @@ pub struct Database {
 
 impl Database {
     pub fn with_db(&self) -> PgConnectOptions {
-        return self.without_db().database(&self.database_name);
+        return self
+            .without_db()
+            .database(&self.database_name)
+            .log_statements(tracing::log::LevelFilter::Trace);
     }
 
     pub fn without_db(&self) -> PgConnectOptions {
