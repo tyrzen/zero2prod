@@ -1,70 +1,106 @@
 use clap::Parser;
+use config;
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
+use std::convert::{TryFrom, TryInto};
+
+pub enum Environment {
+    Local,
+    Production,
+}
+
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
+        return match self {
+            Environment::Local => "local",
+            Environment::Production => "production",
+        };
+    }
+}
+
+impl TryFrom<String> for Environment {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        return match s.to_lowercase().as_str() {
+            "local" => Ok(Self::Local),
+            "production" => Ok(Self::Production),
+            other => Err(format!(
+                "{} is not a supported environment. Use either `local` or `production`.",
+                other
+            )),
+        };
+    }
+}
 
 #[derive(Deserialize, Debug)]
 pub struct Settings {
     pub database: Database,
-    pub app: App,
+    pub application: Application,
 }
 
 #[derive(Deserialize, Parser, Debug)]
 pub struct Database {
-    #[clap(env = "POSTGRES_USER", default_value = "postgres")]
     pub username: String,
-
-    #[clap(env = "POSTGRES_PASSWORD", default_value = "postgres")]
     pub password: Secret<String>,
-
-    #[clap(env = "POSTGRES_HOST_PORT", default_value = "4325")]
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
-
-    #[clap(env = "POSTGRES_HOST", default_value = "0.0.0.0")]
     pub host: String,
-
-    #[clap(env = "POSTGRES_DB", default_value = "newsletter")]
     pub database_name: String,
+    pub require_ssl: bool,
 }
 
 impl Database {
-    pub fn connection_string(&self) -> Secret<String> {
-        return Secret::new(format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.database_name
-        ));
+    pub fn with_db(&self) -> PgConnectOptions {
+        return self.without_db().database(&self.database_name);
     }
 
-    pub fn connection_string_without_db(&self) -> String {
-        return format!(
-            "postgres://{}:{}@{}:{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port
-        );
+    pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+
+        return PgConnectOptions::new()
+            .host(self.host.as_str())
+            .username(self.username.as_str())
+            .password(self.password.expose_secret())
+            .port(self.port)
+            .ssl_mode(ssl_mode);
     }
 }
 
 #[derive(Deserialize, Parser, Debug)]
-pub struct App {
-    #[clap(env = "APP_PORT", default_value = "8000")]
-    pub application_port: u16,
+pub struct Application {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub host: String,
 }
 
-pub fn get_configuration() -> Settings {
-    dotenv::dotenv().ok();
-    let database = Database::parse();
-    let app = App::parse();
+pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    let base_path = std::env::current_dir().expect("Failed to determine the current directory");
+    let configuration_directory = base_path.join("configuration");
 
-    return Settings { database, app };
-}
+    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+        .unwrap_or_else(|_| "local".into())
+        .try_into()
+        .expect("Failed to parse APP_ENVIRONMENT.");
+    let environment_filename = format!("{}.yaml", environment.as_str());
+    let settings = config::Config::builder()
+        .add_source(config::File::from(
+            configuration_directory.join("base.yaml"),
+        ))
+        .add_source(config::File::from(
+            configuration_directory.join(environment_filename),
+        ))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
+        .build()?;
 
-pub fn set_database_url() {
-    dotenv::dotenv().ok();
-    let database = Database::parse();
-    std::env::set_var("DATABASE_URL", database.connection_string().expose_secret());
+    return settings.try_deserialize::<Settings>();
 }
