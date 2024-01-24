@@ -17,7 +17,7 @@ db-create:
 	DATABASE_URL=$(DATABASE_URL) && sqlx database create
 
 db-migrate:
-	export DATABASE_URL=$(DATABASE_URL) && sqlx migrate run
+	export DATABASE_URL=$(DATABASE_URL) && ./scripts/init_db.sh
 
 test-verbose:
 	TEST_LOG=true cargo test | bunyan

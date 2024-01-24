@@ -1,3 +1,4 @@
+use crate::domain::SubscriberEmail;
 use clap::Parser;
 use config;
 use secrecy::{ExposeSecret, Secret};
@@ -35,13 +36,14 @@ impl TryFrom<String> for Environment {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone)]
 pub struct Settings {
     pub database: Database,
     pub application: Application,
+    pub email_client: EmailClient,
 }
 
-#[derive(Deserialize, Parser, Debug)]
+#[derive(Deserialize, Parser, Debug, Clone)]
 pub struct Database {
     pub username: String,
     pub password: Secret<String>,
@@ -76,11 +78,12 @@ impl Database {
     }
 }
 
-#[derive(Deserialize, Parser, Debug)]
+#[derive(Deserialize, Parser, Debug, Clone)]
 pub struct Application {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
+    pub base_url: String,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
@@ -107,4 +110,21 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .build()?;
 
     return settings.try_deserialize::<Settings>();
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct EmailClient {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: Secret<String>,
+    pub timeout_milliseconds: u64,
+}
+
+impl EmailClient {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        return SubscriberEmail::parse(self.sender_email.clone());
+    }
+    pub fn timeout(&self) -> std::time::Duration {
+        return std::time::Duration::from_millis(self.timeout_milliseconds);
+    }
 }

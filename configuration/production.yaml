@@ -2,3 +2,8 @@ application:
   host: 0.0.0.0
 database:
   require_ssl: true
+email_client:
+  base_url: "https://api.postmarkapp.com/"
+  sender_email: "yevhen@bilyk.dev"
+  authorization_token: "2cc8b6a8-7c44-4041-ac90-73b131f79a48"
+  timeout_milliseconds: 10000
