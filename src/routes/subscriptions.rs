@@ -47,7 +47,13 @@ impl fmt::Debug for StoreTokenError {
     }
 }
 
-fn error_chain_fmt(err: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl From<sqlx::Error> for StoreTokenError {
+    fn from(err: sqlx::Error) -> Self {
+        return Self(err);
+    }
+}
+
+pub fn error_chain_fmt(err: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     writeln!(f, "{}\n", err)?;
     let mut current = err.source();
     while let Some(cause) = current {
