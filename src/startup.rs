@@ -1,7 +1,7 @@
 use crate::configuration::{Database, Settings};
 use crate::email_client::EmailClient;
 
-use crate::routes::{health_check, subscribe, confirm};
+use crate::routes::{confirm, health_check, publish_newsletter, subscribe};
 use actix_web::{dev::Server, web, App, HttpServer};
 
 use sqlx::postgres::PgPoolOptions;
@@ -15,7 +15,7 @@ pub struct Application {
     server: Server,
 }
 
-pub struct ApplicationBaseUrl (pub String);
+pub struct ApplicationBaseUrl(pub String);
 
 impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
@@ -43,7 +43,12 @@ impl Application {
         );
         let listener = TcpListener::bind(&address)?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool, email_client, configuration.application.base_url)?;
+        let server = run(
+            listener,
+            connection_pool,
+            email_client,
+            configuration.application.base_url,
+        )?;
 
         return Ok(Self { port, server });
     }
@@ -65,7 +70,7 @@ pub fn run(
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
-    let base_url =web::Data::new(ApplicationBaseUrl(base_url));
+    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
 
     let server = HttpServer::new(move || {
         App::new()
@@ -73,6 +78,7 @@ pub fn run(
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
+            .route("/newsletters", web::post().to(publish_newsletter))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())

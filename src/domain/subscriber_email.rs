@@ -1,7 +1,14 @@
+use std::fmt;
 use validator::validate_email;
 
 #[derive(Clone, Debug)]
 pub struct SubscriberEmail(String);
+
+impl fmt::Display for SubscriberEmail {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        return self.0.fmt(f);
+    }
+}
 
 impl SubscriberEmail {
     pub fn parse(email: String) -> Result<SubscriberEmail, String> {

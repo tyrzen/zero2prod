@@ -1,10 +1,10 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
-use wiremock::{MockServer, Request};
+use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, Database};
-use zero2prod::telemetry::{get_subscriber, init_subscriber};
 use zero2prod::startup::{get_connection_pool, Application};
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
@@ -42,7 +42,10 @@ impl TestApp {
             .expect("Failed to execute request.");
     }
 
-    pub(crate) fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
+    pub(crate) fn get_confirmation_links(
+        &self,
+        email_request: &wiremock::Request,
+    ) -> ConfirmationLinks {
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
         let get_link = |s: &str| {
             let links: Vec<_> = linkify::LinkFinder::new()
@@ -62,6 +65,15 @@ impl TestApp {
         let plain_text = get_link(body["TextBody"].as_str().unwrap());
 
         return ConfirmationLinks { html, plain_text };
+    }
+
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        return reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
     }
 }
 
