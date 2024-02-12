@@ -7,7 +7,6 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use std::convert::{TryFrom, TryInto};
-
 pub enum Environment {
     Local,
     Production,
@@ -41,6 +40,7 @@ pub struct Settings {
     pub database: Database,
     pub application: Application,
     pub email_client: EmailClient,
+    pub redis_uri: Secret<String>,
 }
 
 #[derive(Deserialize, Parser, Debug, Clone)]
@@ -84,6 +84,7 @@ pub struct Application {
     pub port: u16,
     pub host: String,
     pub base_url: String,
+    pub hmac_secret: Secret<String>,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

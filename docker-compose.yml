@@ -22,3 +22,12 @@ services:
     volumes:
       - ${DATA_PATH}:/var/lib/postgresql/data:Z
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS}"]
+
+  redis:
+    image: ${REDIS_IMAGE}
+    restart: always
+    container_name: ${REDIS_CONTAINER_NAME}
+    ports:
+      - ${REDIS_HOST_PORT}:${REDIS_EXPOSE_PORT}
+    volumes:
+      - ${DATA_PATH}:/data

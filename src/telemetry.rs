@@ -1,7 +1,8 @@
-use tracing::{Subscriber, subscriber::set_global_default};
-use tracing_log::LogTracer;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, fmt::MakeWriter};
+use tokio::task::JoinHandle;
+use tracing::{subscriber::set_global_default, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_log::LogTracer;
+use tracing_subscriber::{fmt::MakeWriter, layer::SubscriberExt, EnvFilter, Registry};
 
 /// Compose multiple layers into a `tracing`'s subscriber.
 ///
@@ -10,8 +11,13 @@ use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 /// spell out the actual type of the returned subscriber, which is indeed quite complex.
 /// We need to explicitly call out that the returned subscriber is `Send` and `Sync` to make it
 /// positive to pass it to `init_subscriber` function later on.
-pub fn get_subscriber<Sink>(name: String, env_filter: String, sink: Sink) -> impl Subscriber + Sync + Send
-    where Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
+pub fn get_subscriber<Sink>(
+    name: String,
+    env_filter: String,
+    sink: Sink,
+) -> impl Subscriber + Sync + Send
+where
+    Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
@@ -28,4 +34,13 @@ pub fn get_subscriber<Sink>(name: String, env_filter: String, sink: Sink) -> imp
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger");
     set_global_default(subscriber).expect("Failed to set subscriber");
+}
+
+pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let current_span = tracing::Span::current();
+    tokio::task::spawn_blocking(move || current_span.in_scope(f))
 }
