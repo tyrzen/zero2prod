@@ -2,7 +2,7 @@ use crate::configuration::{Database, Settings};
 use crate::email_client::EmailClient;
 
 use crate::authentication::reject_anonymous_users;
-use crate::routes::admin_dashboard;
+use crate::routes::{admin_dashboard, log_out};
 use crate::routes::health_check;
 use crate::routes::home;
 use crate::routes::login;
@@ -66,7 +66,7 @@ impl Application {
             configuration.application.hmac_secret,
             configuration.redis_uri,
         )
-        .await?;
+            .await?;
 
         return Ok(Self { port, server });
     }
@@ -115,6 +115,7 @@ pub async fn run(
             .service(
                 web::scope("/admin")
                     .wrap(from_fn(reject_anonymous_users))
+                    .route("/logout", web::post().to(log_out))
                     .route("/dashboard", web::get().to(admin_dashboard))
                     .route("/newsletters", web::post().to(publish_newsletter))
                     .route("/password", web::get().to(change_password_form))
@@ -125,8 +126,8 @@ pub async fn run(
             .app_data(base_url.clone())
             .app_data(web::Data::new(hmac_secret.clone()))
     })
-    .listen(listener)?
-    .run();
+        .listen(listener)?
+        .run();
 
     return Ok(server);
 }

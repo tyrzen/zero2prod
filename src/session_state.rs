@@ -10,7 +10,11 @@ impl TypedSession {
     const USER_ID_KEY: &'static str = "user_id";
 
     pub fn renew(&self) {
-        self.0.renew();
+        return self.0.renew();
+    }
+
+    pub fn log_out(&self) {
+        return self.0.purge();
     }
 
     pub fn insert_user_id(&self, user_id: Uuid) -> Result<(), SessionInsertError> {
