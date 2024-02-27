@@ -81,7 +81,7 @@ async fn changing_password_works() {
     let html_page = app.get_change_password_html().await;
     assert!(html_page.contains("<p><i>Your password has been changed.</i></p>"));
 
-    let response = app.post_log_out().await;
+    let response = app.post_logout().await;
     assert_is_redirect_to(&response, "/login");
 
     let html_page = app.get_login_html().await;

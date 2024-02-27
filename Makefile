@@ -29,6 +29,9 @@ docker-build:
 docker-run:
 	docker run -p 8000:8000 $(DOCKER_IMAGE_NAME)
 
+docker-compose:
+	docker-compose up --detach
+
 sqlx-prepare:
 	sqlx prepare -- --lib
 
