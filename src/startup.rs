@@ -27,21 +27,8 @@ pub struct Application {
 
 impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, anyhow::Error> {
-        let connection_pool = get_connection_pool(&configuration.database)
-            .await
-            .expect("Failed to connect to Postgres.");
-
-        let sender_email = configuration
-            .email_client
-            .sender()
-            .expect("Invalid sender email address.");
-        let timeout = configuration.email_client.timeout();
-        let email_client = EmailClient::new(
-            configuration.email_client.base_url,
-            sender_email,
-            configuration.email_client.authorization_token,
-            timeout,
-        );
+        let connection_pool = get_connection_pool(&configuration.database);
+        let email_client = configuration.email_client.client();
 
         let address = format!(
             "{}:{}",
@@ -49,6 +36,7 @@ impl Application {
         );
         let listener = TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();
+
         let server = run(
             listener,
             connection_pool,
@@ -57,7 +45,7 @@ impl Application {
             configuration.application.hmac_secret,
             configuration.redis_uri,
         )
-            .await?;
+        .await?;
 
         Ok(Self { port, server })
     }
@@ -71,10 +59,8 @@ impl Application {
     }
 }
 
-pub async fn get_connection_pool(configuration: &Database) -> Result<PgPool, sqlx::Error> {
-    PgPoolOptions::new()
-        .connect_with(configuration.with_db())
-        .await
+pub fn get_connection_pool(configuration: &Database) -> PgPool {
+    return PgPoolOptions::new().connect_lazy_with(configuration.with_db());
 }
 
 pub struct ApplicationBaseUrl(pub String);
@@ -124,8 +110,8 @@ async fn run(
             .app_data(base_url.clone())
             .app_data(Data::new(HmacSecret(hmac_secret.clone())))
     })
-        .listen(listener)?
-        .run();
+    .listen(listener)?
+    .run();
     Ok(server)
 }
 

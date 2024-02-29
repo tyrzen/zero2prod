@@ -5,6 +5,8 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, Database};
+use zero2prod::email_client::EmailClient;
+use zero2prod::issue_delivery_worker::{ExecutionOutcome, try_execute_task};
 use zero2prod::startup::{get_connection_pool, Application};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -28,6 +30,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
+    pub email_client: EmailClient,
 }
 
 /// Confirmation links embedded in the request to the email API.
@@ -37,6 +40,17 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
+    pub async fn dispatch_all_pending_emails(&self) {
+        loop {
+            if let ExecutionOutcome::EmptyQueue =
+                try_execute_task(&self.db_pool, &self.email_client)
+                    .await
+                    .unwrap()
+            {
+                break;
+            }
+        }
+    }
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/subscriptions", &self.address))
@@ -48,8 +62,8 @@ impl TestApp {
     }
 
     pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
-        where
-            Body: serde::Serialize,
+    where
+        Body: serde::Serialize,
     {
         self.api_client
             .post(&format!("{}/login", &self.address))
@@ -103,8 +117,8 @@ impl TestApp {
     }
 
     pub async fn post_change_password<Body>(&self, body: &Body) -> reqwest::Response
-        where
-            Body: serde::Serialize,
+    where
+        Body: serde::Serialize,
     {
         self.api_client
             .post(&format!("{}/admin/password", &self.address))
@@ -127,8 +141,8 @@ impl TestApp {
     }
 
     pub async fn post_publish_newsletter<Body>(&self, body: &Body) -> reqwest::Response
-        where
-            Body: serde::Serialize,
+    where
+        Body: serde::Serialize,
     {
         self.api_client
             .post(&format!("{}/admin/newsletters", &self.address))
@@ -200,12 +214,11 @@ pub async fn spawn_app() -> TestApp {
     let test_app = TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
-        db_pool: get_connection_pool(&configuration.database)
-            .await
-            .expect("Failed to connect to the database"),
+        db_pool: get_connection_pool(&configuration.database),
         email_server,
         test_user: TestUser::generate(),
         api_client: client,
+        email_client: configuration.email_client.client(),
     };
 
     test_app.test_user.store(&test_app.db_pool).await;
@@ -255,7 +268,7 @@ impl TestUser {
             "username": &self.username,
             "password": &self.password
         }))
-            .await;
+        .await;
     }
 
     async fn store(&self, pool: &PgPool) {
@@ -266,9 +279,9 @@ impl TestUser {
             Version::V0x13,
             Params::new(15000, 2, 1, None).unwrap(),
         )
-            .hash_password(self.password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
         sqlx::query!(
             "INSERT INTO users (user_id, username, password_hash)
             VALUES ($1, $2, $3)",
@@ -276,9 +289,9 @@ impl TestUser {
             self.username,
             password_hash,
         )
-            .execute(pool)
-            .await
-            .expect("Failed to store test user.");
+        .execute(pool)
+        .await
+        .expect("Failed to store test user.");
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::domain::SubscriberEmail;
+use crate::email_client;
 use clap::Parser;
 use config;
 use secrecy::{ExposeSecret, Secret};
@@ -7,6 +8,7 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use std::convert::{TryFrom, TryInto};
+
 pub enum Environment {
     Local,
     Production,
@@ -125,7 +127,20 @@ impl EmailClient {
     pub fn sender(&self) -> Result<SubscriberEmail, String> {
         return SubscriberEmail::parse(self.sender_email.clone());
     }
+
     pub fn timeout(&self) -> std::time::Duration {
         return std::time::Duration::from_millis(self.timeout_milliseconds);
+    }
+
+    pub fn client(self) -> email_client::EmailClient {
+        let sender_email = self.sender().expect("Invalid sender email address");
+        let timeout = self.timeout();
+
+        return email_client::EmailClient::new(
+            self.base_url,
+            sender_email,
+            self.authorization_token,
+            timeout,
+        );
     }
 }

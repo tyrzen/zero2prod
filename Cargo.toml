@@ -45,6 +45,7 @@ htmlescape = "0.3"
 actix-web-flash-messages = { version = "0.4", features = ["cookies"] }
 serde_json = "1"
 actix-web-lab = "0.20"
+serde_urlencoded = "0.7"
 
 [dependencies.reqwest]
 version = "0.11"
